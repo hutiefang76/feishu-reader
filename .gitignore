@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+core/__pycache__/
+
+# Output
+output/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+*.log
+
+# Cloud Document Converter (reference code, not part of this project)
+cloud-document-converter/
