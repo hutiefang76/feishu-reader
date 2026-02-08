@@ -1,10 +1,12 @@
 ---
 name: feishu-extract
-description: Extract Feishu (Lark) cloud documents to high-quality Markdown via Chrome CDP, preserving tables, colors, strikethrough, images, code blocks, and all inline styles. Use when the user wants to read, extract, download, save, or convert a Feishu/Lark document URL to Markdown. Triggers on URLs matching feishu.cn/docx, feishu.cn/wiki, feishu.cn/doc, feishu.cn/sheets, feishu.cn/hc, or larksuite.com equivalents. Also use for listing, searching, or reading previously extracted documents. Supports batch extraction of multiple URLs. Keywords: 飞书, Lark, feishu, 飞书文档, cloud document, markdown conversion, 文档提取.
+description: "Extract Feishu (Lark) cloud documents to high-quality Markdown via Chrome CDP, preserving tables, colors, strikethrough, images, code blocks, and all inline styles. Use when the user wants to read, extract, download, save, or convert a Feishu/Lark document URL to Markdown. Triggers on URLs matching feishu.cn/docx, feishu.cn/wiki, feishu.cn/doc, feishu.cn/sheets, feishu.cn/hc, or larksuite.com equivalents. Also use for listing, searching, or reading previously extracted documents. Supports batch extraction of multiple URLs. Keywords: 飞书, Lark, feishu, 飞书文档, cloud document, markdown conversion, 文档提取."
 allowed-tools: Bash, Read, Glob, Grep
 ---
 
 # Feishu Document Extraction
+
+**Skill root**: Find the `feishu-reader` directory containing `feishu_skill.py`. All commands below must run from that directory.
 
 ## Decision Tree
 
@@ -20,52 +22,53 @@ User request → Contains feishu.cn or larksuite.com URL?
 
 ## Commands
 
-All commands use `.venv/bin/python3 feishu_skill.py` as entry point. All return JSON with `success` field.
+Run all commands from the `feishu-reader` directory using `.venv/bin/python3`. All return JSON with `success` field.
 
-**Extract single document:**
 ```bash
-.venv/bin/python3 feishu_skill.py extract "$ARGUMENTS"
+# Environment check (run first)
+cd feishu-reader && .venv/bin/python3 feishu_skill.py status
+
+# Extract single document
+cd feishu-reader && .venv/bin/python3 feishu_skill.py extract "<feishu-url>"
+
+# Batch extract
+cd feishu-reader && .venv/bin/python3 feishu_skill.py batch "<url1>" "<url2>"
+
+# List / Search / Read
+cd feishu-reader && .venv/bin/python3 feishu_skill.py list
+cd feishu-reader && .venv/bin/python3 feishu_skill.py search "<keyword>"
+cd feishu-reader && .venv/bin/python3 feishu_skill.py read "<path>"
 ```
 
-**Batch extract:**
-```bash
-.venv/bin/python3 feishu_skill.py batch "url1" "url2" "url3"
-```
-
-**List / Search / Read:**
-```bash
-.venv/bin/python3 feishu_skill.py list
-.venv/bin/python3 feishu_skill.py search "keyword"
-.venv/bin/python3 feishu_skill.py read "output/doc.md"
-```
-
-**Environment check:**
-```bash
-.venv/bin/python3 feishu_skill.py status
-```
+If environment not ready, run `cd feishu-reader && bash setup.sh`.
 
 ## Workflow
 
-1. Run `status` — if not ready, run `bash setup.sh`
-2. Run `extract "<url>"` — Chrome opens automatically
-3. If first run or session expired, user scans QR code to login in the opened Chrome window
+1. Run `status` — verify dependencies, Chrome, and session
+2. Run `extract "<url>"` — Chrome opens, navigates to document
+3. If first run or session expired, user scans QR code in the opened Chrome window
 4. Tool auto-detects: login state, URL redirects, error pages (with interactive recovery), and content stability (block count polling)
 5. Output: `output/<title>.md` + `output/<title>/` (images)
 
 ## Examples
 
-**Single extraction:**
+**Successful extraction:**
 ```
-$ .venv/bin/python3 feishu_skill.py extract "https://xxx.feishu.cn/docx/abc123"
+$ cd feishu-reader && .venv/bin/python3 feishu_skill.py extract "https://xxx.feishu.cn/docx/abc123"
 {"success": true, "title": "文档标题", "md_path": "/path/output/文档标题.md",
  "char_count": 12345, "image_count": 3, "method": "cdp_pagemain"}
 ```
 
-**Failed extraction (not logged in):**
+**Login required:**
 ```
 [Login/登录] Please scan QR code or enter credentials in Chrome
 ```
 → User scans QR in opened Chrome → extraction continues automatically.
+
+**Invalid URL:**
+```
+{"success": false, "error": "不是有效的飞书文档 URL: https://bad-url.com"}
+```
 
 ## Edge Cases
 
