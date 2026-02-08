@@ -72,18 +72,22 @@ Output saved to `output/` directory by default.
 
 ## AI Integration / AI 集成
 
-### Kiro Skills
+### Claude Code
 
-Built-in Kiro Skill at `.kiro/skills/feishu-extract.md`. Type `#feishu-extract` in Kiro chat to use.
+Built-in Claude Code Skill at `.claude/skills/feishu-extract/SKILL.md`. Clone this repo and Claude Code auto-discovers the skill. Use `/feishu-extract <url>` or just ask Claude to extract a Feishu document.
 
-### Claude Code / Cursor / Windsurf
+### Kiro
 
-Add to your AI IDE knowledge base (e.g. `CLAUDE.md`):
+Kiro Skill at `.kiro/skills/feishu-extract.md`. Type `#feishu-extract` in Kiro chat to use.
+
+### Cursor / Windsurf / Other AI IDEs
+
+Add to your AI IDE knowledge base (e.g. `CLAUDE.md`, `.cursorrules`):
 
 ```
 ## Feishu Document Extraction
 
-Commands (run from project root):
+Commands (run from feishu-reader directory):
 - Status:  .venv/bin/python3 feishu_skill.py status
 - Extract: .venv/bin/python3 feishu_skill.py extract "<feishu_url>"
 - Batch:   .venv/bin/python3 feishu_skill.py batch "<url1>" "<url2>"
