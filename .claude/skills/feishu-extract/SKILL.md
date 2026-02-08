@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Glob, Grep
 
 # Feishu Document Extraction
 
-**Skill root**: Find the `feishu-reader` directory containing `feishu_skill.py`. All commands below must run from that directory.
+**Skill root**: Locate the directory containing `feishu_skill.py`. Search: current project subdirectories → `~/feishu-reader` → `~/projects/**/feishu-reader`. All commands below run from that directory.
 
 ## Decision Tree
 
@@ -22,25 +22,18 @@ User request → Contains feishu.cn or larksuite.com URL?
 
 ## Commands
 
-Run all commands from the `feishu-reader` directory using `.venv/bin/python3`. All return JSON with `success` field.
+First `cd` into the skill root, then run via `.venv/bin/python3`. All return JSON with `success` field.
 
 ```bash
-# Environment check (run first)
-cd feishu-reader && .venv/bin/python3 feishu_skill.py status
-
-# Extract single document
-cd feishu-reader && .venv/bin/python3 feishu_skill.py extract "<feishu-url>"
-
-# Batch extract
-cd feishu-reader && .venv/bin/python3 feishu_skill.py batch "<url1>" "<url2>"
-
-# List / Search / Read
-cd feishu-reader && .venv/bin/python3 feishu_skill.py list
-cd feishu-reader && .venv/bin/python3 feishu_skill.py search "<keyword>"
-cd feishu-reader && .venv/bin/python3 feishu_skill.py read "<path>"
+.venv/bin/python3 feishu_skill.py status
+.venv/bin/python3 feishu_skill.py extract "<feishu-url>"
+.venv/bin/python3 feishu_skill.py batch "<url1>" "<url2>"
+.venv/bin/python3 feishu_skill.py list
+.venv/bin/python3 feishu_skill.py search "<keyword>"
+.venv/bin/python3 feishu_skill.py read "<path>"
 ```
 
-If environment not ready, run `cd feishu-reader && bash setup.sh`.
+If environment not ready, run `bash setup.sh` in the skill root.
 
 ## Workflow
 
@@ -54,7 +47,7 @@ If environment not ready, run `cd feishu-reader && bash setup.sh`.
 
 **Successful extraction:**
 ```
-$ cd feishu-reader && .venv/bin/python3 feishu_skill.py extract "https://xxx.feishu.cn/docx/abc123"
+$ .venv/bin/python3 feishu_skill.py extract "https://xxx.feishu.cn/docx/abc123"
 {"success": true, "title": "文档标题", "md_path": "/path/output/文档标题.md",
  "char_count": 12345, "image_count": 3, "method": "cdp_pagemain"}
 ```

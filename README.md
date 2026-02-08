@@ -74,7 +74,19 @@ Output saved to `output/` directory by default.
 
 ### Claude Code
 
-Built-in Claude Code Skill at `.claude/skills/feishu-extract/SKILL.md`. Clone this repo and Claude Code auto-discovers the skill. Use `/feishu-extract <url>` or just ask Claude to extract a Feishu document.
+```bash
+# 1. Clone & setup / 克隆并安装
+git clone https://github.com/hutiefang76/feishu-reader.git ~/feishu-reader
+cd ~/feishu-reader && bash setup.sh
+
+# 2. Install skill globally / 全局安装 Skill
+mkdir -p ~/.claude/skills/feishu-extract
+cp ~/feishu-reader/.claude/skills/feishu-extract/SKILL.md ~/.claude/skills/feishu-extract/
+```
+
+After installation, the skill is available in **any project directory**. Ask Claude to extract a Feishu document or use `/feishu-extract <url>`.
+
+安装后在任意项目目录下均可使用，直接让 Claude 提取飞书文档或使用 `/feishu-extract <url>`。
 
 ### Kiro
 
@@ -120,7 +132,8 @@ extract_feishu.py   — Main entry script
 setup.sh / setup.bat — Environment setup (auto-install Python/Chrome/deps)
 requirements.txt    — Python dependency (websocket-client only)
 output/             — Extracted documents
-.kiro/skills/       — Kiro AI Skill definition
+.claude/skills/       — Claude Code Skill definition
+.kiro/skills/        — Kiro AI Skill definition
 ```
 
 ## Requirements / 系统要求
