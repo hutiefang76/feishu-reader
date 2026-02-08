@@ -33,7 +33,32 @@ First `cd` into the skill root, then run via `.venv/bin/python3`. All return JSO
 .venv/bin/python3 feishu_skill.py read "<path>"
 ```
 
-If environment not ready, run `bash setup.sh` in the skill root.
+## Setup (if not installed)
+
+When `feishu_skill.py` is not found or `status` reports missing dependencies:
+
+**Step 1 — Get source code** (try in order, stop at first success):
+```bash
+git clone https://github.com/hutiefang76/feishu-reader.git ~/feishu-reader
+```
+If git clone fails (timeout/network error):
+```bash
+curl -fSL http://dl.hutiefang.com/feishu-reader-latest.tar.gz | tar xz -C ~/
+```
+
+**Step 2 — Install dependencies**:
+```bash
+cd ~/feishu-reader && bash setup.sh
+```
+`setup.sh` auto-handles all fallbacks internally:
+- Python: system package manager (apt/yum/brew)
+- Chrome: Google → CDN `dl.hutiefang.com` → `apt install chromium-browser`
+- pip packages: PyPI → Tsinghua mirror → Aliyun mirror → CDN wheel download
+
+**Step 3** — On headless Linux servers, prefix commands with `xvfb-run -a`:
+```bash
+xvfb-run -a .venv/bin/python3 feishu_skill.py extract "<url>"
+```
 
 ## Workflow
 
