@@ -335,7 +335,7 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
         if not launch_chrome():
             return {"success": False, "error": "Chrome launch failed / Chrome 启动失败"}
 
-    # 2. Open or reuse tab
+    # 2. Open or reuse tab — inject cookies BEFORE navigating
     ws_url = find_tab(feishu_url)
     if ws_url:
         ws = websocket.create_connection(ws_url, timeout=60)
@@ -343,24 +343,33 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
         cdp(ws, "Page.enable")
         js(ws, "location.reload()")
     else:
+        # Inject cookies into any existing tab first (global cookie store)
         any_ws = get_any_tab()
         if any_ws:
             tmp = websocket.create_connection(any_ws, timeout=60)
             cdp(tmp, "Network.enable")
             load_cookies(tmp)
             tmp.close()
+            time.sleep(0.5)
+        # Now open target URL — cookies already in Chrome's store
         ws_url = open_tab(feishu_url)
         ws = websocket.create_connection(ws_url, timeout=60)
         cdp(ws, "Network.enable")
         cdp(ws, "Page.enable")
-        load_cookies(ws)
 
     # 3. Wait for page load
     time.sleep(max(wait, 5))
     dismiss_popups(ws)
 
-    # 4. Check login
+    # 4. Check login — retry once after reload (cookies may need a second pass)
     login_status = check_login(ws)
+    if login_status != 'logged_in':
+        load_cookies(ws)
+        js(ws, f'window.location.href = "{feishu_url}";')
+        time.sleep(max(wait, 5))
+        dismiss_popups(ws)
+        login_status = check_login(ws)
+
     if login_status != 'logged_in':
         print("[CDP] Login required / 需要登录...")
         if not wait_for_login(ws, feishu_url):

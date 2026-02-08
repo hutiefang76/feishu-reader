@@ -1227,11 +1227,11 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
             cdp(tmp, "Network.enable")
             load_cookies(tmp)
             tmp.close()
+            time.sleep(0.5)
         ws_url = open_tab(feishu_url)
         ws = websocket.create_connection(ws_url, timeout=60)
         cdp(ws, "Network.enable")
         cdp(ws, "Page.enable")
-        load_cookies(ws)
 
     # 3. 等待页面加载
     time.sleep(max(wait, 5))
@@ -1240,13 +1240,19 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
     # 3.5 捕获实际 URL（跟随重定向后）
     actual_url = resolve_actual_url(ws)
     if actual_url and actual_url != feishu_url:
-        # 过滤掉登录页 URL，仅记录文档 URL 变化
         if 'accounts/page/login' not in actual_url and 'passport.feishu.cn' not in actual_url:
             print(f"[URL] 实际 URL 与输入不同: {actual_url}")
             feishu_url = actual_url
 
-    # 4. 检查登录
+    # 4. 检查登录 — 失败后重试一次（cookie 可能需要二次注入）
     login_status = check_login(ws)
+    if login_status != 'logged_in':
+        load_cookies(ws)
+        js(ws, f'window.location.href = "{feishu_url}";')
+        time.sleep(max(wait, 5))
+        dismiss_popups(ws)
+        login_status = check_login(ws)
+
     if login_status != 'logged_in':
         print("[CDP] 需要登录...")
         if not wait_for_login(ws, feishu_url):
