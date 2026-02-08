@@ -760,22 +760,175 @@ def dismiss_popups(ws):
     })()
     """)
 
+def check_page_error(ws):
+    """
+    通用页面错误检测 — 基于结构排除法，不依赖特定语言文案。
+    策略：如果页面既非文档页、也非登录页，且缺乏文档结构 → 判定为错误页。
+    返回错误描述字符串或 None（页面正常）。
+    """
+    result = js(ws, """
+    (() => {
+        const url = location.href || '';
+        // 登录页不算错误
+        if (url.includes('/accounts/page/login') || url.includes('passport.feishu.cn'))
+            return null;
+        // 有文档结构 → 正常
+        if (window.PageMain && window.PageMain.blockManager
+            && window.PageMain.blockManager.rootBlockModel) return null;
+        if (window.editor) return null;
+        if (document.querySelector('#docx > div div[data-block-id]')) return null;
+        if (document.querySelector('.help-center-content')) return null;
+        if (document.querySelector('[data-content-editable-root]')) return null;
+        // 无文档结构，收集诊断信息
+        const title = document.title || '';
+        const body = (document.body && document.body.innerText) || '';
+        const short = body.substring(0, 300).replace(/\\s+/g, ' ').trim();
+        // 检测数字错误码模式 (如 4401, 403, 404, 500)
+        const codeMatch = short.match(/\\b[0-9]{3,5}\\b/);
+        const errorCode = codeMatch ? codeMatch[0] : '';
+        // 页面内容极少（< 200 字符）且无文档结构 → 大概率是错误/空页面
+        if (body.length < 200)
+            return 'page_error' + (errorCode ? ':' + errorCode : '') + '|' + short.substring(0, 100);
+        return null;
+    })()
+    """)
+    return result
+
+
+def resolve_actual_url(ws):
+    """获取浏览器当前实际 URL（跟随重定向后的）。"""
+    return js(ws, "location.href") or ""
+
+
+def _is_doc_page(ws):
+    """通用文档页面检测 — 检查是否存在任何已知的文档结构。"""
+    result = js(ws, """
+    (() => {
+        if (window.PageMain && window.PageMain.blockManager
+            && window.PageMain.blockManager.rootBlockModel) return 'pagemain';
+        if (window.editor) return 'editor';
+        if (document.querySelector('#docx > div div[data-block-id]')) return 'docx';
+        if (document.querySelector('.help-center-content')) return 'hc';
+        if (document.querySelector('[data-content-editable-root]')) return 'editable';
+        return null;
+    })()
+    """)
+    return result
+
+
+def wait_for_user_fix(ws, error_msg, timeout=300):
+    """
+    检测到错误页面后，提示用户在 Chrome 中自行修正，持续监测直到出现有效文档页。
+    基于结构化检测，不依赖语言。返回 True 表示用户已修正。
+    """
+    print(f"[错误] 页面异常: {error_msg}")
+    print("[操作] ════════════════════════════════════════")
+    print("[操作]  请在 Chrome 浏览器中手动处理：")
+    print("[操作]  - 输入正确的文档 URL")
+    print("[操作]  - 或用有权限的账号重新登录")
+    print("[操作]  修正后工具会自动检测并继续提取")
+    print(f"[操作]  等待中...（最长 {timeout // 60} 分钟）")
+    print("[操作] ════════════════════════════════════════")
+
+    start = time.time()
+    while time.time() - start < timeout:
+        time.sleep(3)
+        ready = _is_doc_page(ws)
+        if ready:
+            actual_url = resolve_actual_url(ws)
+            print(f"[操作] ✅ 检测到有效文档页面: {actual_url}")
+            return True
+        elapsed = int(time.time() - start)
+        if elapsed > 0 and elapsed % 30 == 0:
+            print(f"[操作] ⏳ 已等待 {elapsed}s，剩余 {timeout - elapsed}s...")
+    print("[操作] ⏰ 等待超时")
+    return False
+
+
+def wait_for_content_stable(ws, checks=3, interval=2):
+    """轮询 block count 直到连续 checks 次一致，同时逐步输出文档大纲。"""
+    last_count = -1
+    stable = 0
+    shown_headings = set()
+
+    for i in range(checks * 3):
+        # 同时获取 block count 和当前大纲
+        result = js(ws, """
+        (() => {
+            const root = window.PageMain?.blockManager?.rootBlockModel;
+            if (!root) return JSON.stringify({count: -1, headings: [], preview: ''});
+            let n = 0;
+            const headings = [];
+            let previewLines = [];
+            function walk(b) {
+                n++;
+                const type = b.type || '';
+                const ops = b.zoneState?.content?.ops;
+                let text = '';
+                if (ops) text = ops.map(o => o.insert || '').join('').replace(/\\n$/, '');
+                const hm = type.match(/^heading(\\d)$/);
+                if (hm && text) {
+                    headings.push({lvl: parseInt(hm[1]), text: text.substring(0, 80)});
+                }
+                if (previewLines.length < 5 && text.length > 5 && type !== 'page')
+                    previewLines.push(text.substring(0, 60));
+                (b.children || []).forEach(walk);
+            }
+            walk(root);
+            return JSON.stringify({count: n, headings: headings, preview: previewLines.join(' | ')});
+        })()
+        """)
+
+        parsed = {"count": -1, "headings": [], "preview": ""}
+        try:
+            parsed = json.loads(result) if result else parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        count = int(parsed.get("count", -1))
+
+        # 首次获取到内容时输出预览
+        if i == 0 and count > 0:
+            preview = parsed.get("preview", "")
+            if preview:
+                print(f"[预览] {preview}")
+
+        # 逐步输出新发现的标题
+        for h in parsed.get("headings", []):
+            key = f"h{h['lvl']}:{h['text']}"
+            if key not in shown_headings:
+                shown_headings.add(key)
+                prefix = "#" * min(h["lvl"], 4)
+                print(f"[加载] {prefix} {h['text']}")
+
+        if count == last_count and count > 0:
+            stable += 1
+            if stable >= checks:
+                print(f"[验证] ✅ 内容稳定 ({count} blocks, {len(shown_headings)} 个标题)")
+                return count
+        else:
+            if count != last_count and last_count > 0:
+                print(f"[加载] blocks: {last_count} → {count}")
+            stable = 0
+        last_count = count
+        time.sleep(interval)
+    print(f"[验证] ⚠️ 内容可能未完全加载 (最终 {last_count} blocks)")
+    return last_count
+
+
 def wait_for_doc_ready(ws, timeout=30):
     print("[等待] 文档加载中...")
     start = time.time()
     while time.time() - start < timeout:
-        ready = js(ws, """
-        (() => {
-            if (window.PageMain && window.PageMain.blockManager &&
-                window.PageMain.blockManager.rootBlockModel) return 'pagemain';
-            if (document.querySelector('#docx > div div[data-block-id]')) return 'docx';
-            if (document.querySelector('.help-center-content')) return 'hc';
-            return null;
-        })()
-        """)
+        ready = _is_doc_page(ws)
         if ready:
             print(f"[等待] ✅ 文档就绪 (类型: {ready})")
             return ready
+        # 页面加载过半后才检测错误（前 5 秒给页面加载缓冲）
+        if time.time() - start > 5:
+            err = check_page_error(ws)
+            if err:
+                return 'page_error'
         time.sleep(1)
         dismiss_popups(ws)
     print("[等待] ⏰ 文档加载超时")
@@ -1084,6 +1237,14 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
     time.sleep(max(wait, 5))
     dismiss_popups(ws)
 
+    # 3.5 捕获实际 URL（跟随重定向后）
+    actual_url = resolve_actual_url(ws)
+    if actual_url and actual_url != feishu_url:
+        # 过滤掉登录页 URL，仅记录文档 URL 变化
+        if 'accounts/page/login' not in actual_url and 'passport.feishu.cn' not in actual_url:
+            print(f"[URL] 实际 URL 与输入不同: {actual_url}")
+            feishu_url = actual_url
+
     # 4. 检查登录
     login_status = check_login(ws)
     if login_status != 'logged_in':
@@ -1094,14 +1255,37 @@ def extract_via_cdp(feishu_url, output_path=None, wait=10):
         js(ws, f'window.location.href = "{feishu_url}";')
         time.sleep(max(wait, 5))
         dismiss_popups(ws)
+        # 登录后再次捕获实际 URL
+        actual_url = resolve_actual_url(ws)
+        if actual_url and 'accounts/page/login' not in actual_url and 'passport.feishu.cn' not in actual_url:
+            if actual_url != feishu_url:
+                print(f"[URL] 登录后实际 URL: {actual_url}")
+                feishu_url = actual_url
 
     # 5. 等待文档就绪
     doc_type = wait_for_doc_ready(ws)
-    if not doc_type:
+
+    # 5.5 错误页面检测 → 等待用户修正
+    if doc_type == 'page_error':
+        err_detail = check_page_error(ws) or "未知错误"
+        if wait_for_user_fix(ws, err_detail):
+            feishu_url = resolve_actual_url(ws) or feishu_url
+            save_cookies(ws)
+            time.sleep(3)
+            doc_type = wait_for_doc_ready(ws)
+        else:
+            ws.close()
+            return {"success": False, "error": f"页面错误且未修正: {err_detail}"}
+
+    if not doc_type or doc_type == 'page_error':
         ws.close()
         return {"success": False, "error": "文档加载超时"}
 
     save_cookies(ws)
+
+    # 5.8 内容稳定性验证
+    if doc_type in ('pagemain', 'docx'):
+        wait_for_content_stable(ws)
 
     # 6. 提取
     md_text = None
