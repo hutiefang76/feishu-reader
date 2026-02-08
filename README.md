@@ -26,16 +26,21 @@ Supported content / 支持的内容:
 
 ```bash
 # macOS / Linux
-bash setup.sh
+git clone https://github.com/hutiefang76/feishu-reader.git ~/feishu-reader
+cd ~/feishu-reader && bash setup.sh
+
+# GitHub 不通时使用 CDN 兜底 / China fallback if GitHub is blocked
+curl -fSL http://dl.hutiefang.com/feishu-reader-latest.tar.gz | tar xz
+cd feishu-reader && bash setup.sh
 
 # Windows
 setup.bat
 ```
 
 Auto-detects and installs: Python 3.8+ → virtual environment → `websocket-client` → Chrome.
-Prompts before installing anything. Supports China mirror fallback.
+Prompts before installing anything. Supports China mirror fallback (Tsinghua, Aliyun, CDN).
 
-自动检测安装：Python → 虚拟环境 → 依赖 → Chrome。安装前会询问确认，支持国内镜像降级。
+自动检测安装：Python → 虚拟环境 → 依赖 → Chrome。安装前会询问确认，支持国内镜像降级（清华、阿里云、CDN 兜底）。
 
 ### 2. Login / 登录飞书
 
@@ -146,9 +151,27 @@ output/             — Extracted documents
 ## Notes / 注意事项
 
 - Chrome runs in CDP debug mode (port 9222), `setup.sh` auto-configures
-- First use requires Feishu login, session cached at `~/Library/Caches/feishu-reader/cookies.json`
+- First use requires Feishu login, session cached at `~/.cache/feishu-reader/cookies.json`
 - URLs must be quoted in zsh to prevent glob expansion
 - pip install supports China mirror auto-fallback (Tsinghua, Aliyun)
+- setup.sh download chain: Google/PyPI → China mirrors → CDN `dl.hutiefang.com`
+
+## CDN Fallback / 国内下载兜底
+
+All download dependencies have CDN fallback via `dl.hutiefang.com` (Qiniu Cloud):
+
+| Resource | Primary | Fallback |
+|----------|---------|----------|
+| Source code | GitHub | `http://dl.hutiefang.com/feishu-reader-latest.tar.gz` |
+| Chrome (Linux) | dl.google.com | CDN → `apt install chromium-browser` |
+| websocket-client | PyPI → Tsinghua → Aliyun | `http://dl.hutiefang.com/websocket_client-1.9.0-py3-none-any.whl` |
+
+CDN maintenance / CDN 维护:
+```bash
+# Update tarball after release / 发版后更新
+git archive --format=tar.gz --prefix=feishu-reader/ -o /tmp/feishu-reader-latest.tar.gz HEAD
+qshell fput feishu-reader feishu-reader-latest.tar.gz /tmp/feishu-reader-latest.tar.gz --overwrite
+```
 
 ## License
 

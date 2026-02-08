@@ -56,3 +56,12 @@ See `docs/feishu-document-internals.md` for full technical docs.
 - Tables are critical (field names and colors matter for AI)
 - pip install needs mirror fallback (China network)
 - Can use any free third-party code/libraries
+
+## CDN Fallback / 国内下载兜底
+- Domain: `dl.hutiefang.com` (Qiniu Cloud, ICP filed)
+- CNAME: `dl-hutiefang-com-idvr3r5.qiniudns.com` (DNS on Tencent Cloud DNSPod)
+- Bucket: `feishu-reader` (public), qshell account: `fileconverter`
+- Hosted files: `feishu-reader-latest.tar.gz`, `websocket_client-1.9.0-py3-none-any.whl`
+- setup.sh/setup.bat download chain: Primary → China mirrors → CDN fallback
+- Update CDN after release: `git archive ... | qshell fput feishu-reader ...`
+- Test domain `ta56d8sky.hd-bkt.clouddn.com` expires in 30 days — do NOT depend on it
