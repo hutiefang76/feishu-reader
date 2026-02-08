@@ -12,6 +12,7 @@ set -euo pipefail
 VENV_DIR=".venv"
 MIN_PY_MAJOR=3
 MIN_PY_MINOR=8
+CDN_BASE="http://dl.hutiefang.com"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -170,20 +171,35 @@ else
         else
             if command -v apt-get &>/dev/null; then
                 DEB="/tmp/chrome.deb"
-                curl -fSL --connect-timeout 30 -o "$DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-                sudo apt-get install -y "$DEB" 2>/dev/null || { sudo dpkg -i "$DEB"; sudo apt-get install -f -y; }
-                rm -f "$DEB"
+                curl -fSL --connect-timeout 15 -o "$DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" 2>/dev/null || \
+                    curl -fSL --connect-timeout 15 -o "$DEB" "${CDN_BASE}/google-chrome-stable_current_amd64.deb" 2>/dev/null || true
+                if [ -f "$DEB" ] && [ -s "$DEB" ]; then
+                    sudo apt-get install -y "$DEB" 2>/dev/null || { sudo dpkg -i "$DEB"; sudo apt-get install -f -y; }
+                    rm -f "$DEB"
+                else
+                    warn "Chrome download failed, trying chromium... / Chrome 下载失败，尝试 chromium..."
+                    sudo apt-get update -qq && sudo apt-get install -y chromium-browser 2>/dev/null || \
+                        sudo apt-get install -y chromium 2>/dev/null || \
+                        sudo snap install chromium 2>/dev/null || true
+                fi
             elif command -v yum &>/dev/null || command -v dnf &>/dev/null; then
                 RPM="/tmp/chrome.rpm"
-                curl -fSL --connect-timeout 30 -o "$RPM" "https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm"
-                sudo yum localinstall -y "$RPM" 2>/dev/null || sudo dnf install -y "$RPM"
-                rm -f "$RPM"
+                curl -fSL --connect-timeout 15 -o "$RPM" "https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm" 2>/dev/null || \
+                    curl -fSL --connect-timeout 15 -o "$RPM" "${CDN_BASE}/google-chrome-stable_current_x86_64.rpm" 2>/dev/null || true
+                if [ -f "$RPM" ] && [ -s "$RPM" ]; then
+                    sudo yum localinstall -y "$RPM" 2>/dev/null || sudo dnf install -y "$RPM"
+                    rm -f "$RPM"
+                else
+                    warn "Chrome download failed, trying chromium... / Chrome 下载失败，尝试 chromium..."
+                    sudo dnf install -y chromium 2>/dev/null || sudo yum install -y chromium 2>/dev/null || true
+                fi
             else
                 err "Cannot auto-install Chrome on this system"
                 echo "  https://www.google.com/chrome/"
                 exit 1
             fi
-            info "Chrome installed / Chrome 已安装"
+            CHROME_PATH=$(find_chrome || echo "")
+            [ -n "$CHROME_PATH" ] && info "Chrome installed / Chrome 已安装"
         fi
         CHROME_PATH=$(find_chrome || echo "")
         [ -z "$CHROME_PATH" ] && { err "Chrome install failed / Chrome 安装失败"; exit 1; }
@@ -212,14 +228,11 @@ source "$VENV_DIR/bin/activate"
 
 pip_install() {
     local args="$*"
-    # Try official PyPI first
     if pip install --timeout 15 $args -q 2>/dev/null; then return 0; fi
     warn "PyPI timeout, trying China mirrors... / 官方源超时，尝试国内镜像..."
-    # Tsinghua mirror
     if pip install --timeout 15 -i "https://pypi.tuna.tsinghua.edu.cn/simple" --trusted-host "pypi.tuna.tsinghua.edu.cn" $args -q 2>/dev/null; then
         info "Installed via Tsinghua mirror / 清华镜像安装成功"; return 0
     fi
-    # Aliyun mirror
     if pip install --timeout 15 -i "https://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com" $args -q 2>/dev/null; then
         info "Installed via Aliyun mirror / 阿里云镜像安装成功"; return 0
     fi
@@ -228,7 +241,16 @@ pip_install() {
 }
 
 pip_install --upgrade pip
-pip_install -r requirements.txt
+if ! pip_install -r requirements.txt; then
+    warn "Trying CDN fallback for websocket-client... / 尝试 CDN 兜底..."
+    WHL="/tmp/websocket_client.whl"
+    if curl -fSL --connect-timeout 15 -o "$WHL" "${CDN_BASE}/websocket_client-1.9.0-py3-none-any.whl" 2>/dev/null && [ -s "$WHL" ]; then
+        pip install "$WHL" -q && info "Installed via CDN / CDN 安装成功" || { err "CDN install failed"; exit 1; }
+        rm -f "$WHL"
+    else
+        err "CDN download failed / CDN 下载失败"; exit 1
+    fi
+fi
 
 # Verify
 "$PYTHON_CMD" -c "import websocket; print(f'[OK] websocket-client {websocket.__version__}')" || { err "Dependency check failed"; exit 1; }

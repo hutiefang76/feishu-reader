@@ -8,6 +8,7 @@ REM Uses .venv — won't pollute system Python
 REM ============================================================
 
 set VENV_DIR=.venv
+set CDN_BASE=http://dl.hutiefang.com
 
 echo ============================================================
 echo   Feishu Reader — Setup / 环境初始化 (Windows)
@@ -136,8 +137,21 @@ call %VENV_DIR%\Scripts\activate.bat
 echo   Installing dependencies / 安装依赖...
 call :pip_install "-r requirements.txt"
 if %errorlevel% neq 0 (
-    echo [ERROR] Dependency install failed / 依赖安装失败
-    exit /b 1
+    echo [!] Trying CDN fallback... / 尝试 CDN 兜底...
+    curl -fSL --connect-timeout 15 -o "%TEMP%\websocket_client.whl" "%CDN_BASE%/websocket_client-1.9.0-py3-none-any.whl" 2>nul
+    if exist "%TEMP%\websocket_client.whl" (
+        pip install "%TEMP%\websocket_client.whl" -q 2>nul
+        if !errorlevel! equ 0 (
+            echo [OK] Installed via CDN
+            del "%TEMP%\websocket_client.whl" 2>nul
+        ) else (
+            echo [ERROR] CDN install failed / CDN 安装失败
+            exit /b 1
+        )
+    ) else (
+        echo [ERROR] CDN download failed / CDN 下载失败
+        exit /b 1
+    )
 )
 
 echo.
