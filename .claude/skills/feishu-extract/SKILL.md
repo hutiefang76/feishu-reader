@@ -78,6 +78,16 @@ $ cd feishu-reader && .venv/bin/python3 feishu_skill.py extract "https://xxx.fei
 - Sheet spreadsheets: requires scroll-loading, slightly longer extraction
 - Large documents: progressive outline output during content stability check
 
+## Failed Approaches (do not retry)
+
+1. **Feishu API** — requires app credentials, not universal for arbitrary accounts
+2. **CDP DOM parsing** — Feishu uses virtual rendering; tables are canvas, styles lost
+3. **Tampermonkey injection** — gets text structure but loses tables/colors/strikethrough
+4. **CDP clipboard (Ctrl+A/C)** — `isTrusted=false`, Feishu editor ignores synthetic events
+5. **System keyboard simulation** — needs accessibility permissions, not cross-platform
+6. **`type === 'heading'` check** — Feishu uses `heading1`..`heading9`, not `heading`
+7. **Hardcoded Chinese error text matching** — breaks on locale changes; use structural exclusion instead
+
 ## Reference Files
 
 - **Technical internals**: See [docs/feishu-document-internals.md](../../docs/feishu-document-internals.md) for PageMain block types, data model, and Sheet cell style details
