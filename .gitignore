@@ -11,7 +11,8 @@ output/
 # IDE
 .idea/
 .vscode/
-.claude/
+.claude/*
+!.claude/skills/
 *.swp
 
 # OS

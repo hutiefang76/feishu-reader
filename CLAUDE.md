@@ -25,7 +25,7 @@ feishu_api.py       — [DEPRECATED] API approach (not used)
 setup.sh / setup.bat — Environment setup (auto-install Python/Chrome/deps)
 requirements.txt    — Python dependency: websocket-client only
 output/             — Extracted documents
-.kiro/skills/       — Kiro AI Skill definition
+.claude/skills/     — Claude Code Skill definition
 ```
 
 ## Architecture / 技术架构
