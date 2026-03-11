@@ -40,6 +40,18 @@ See `docs/feishu-document-internals.md` for full technical docs.
 4. CDP clipboard Ctrl+A/C — isTrusted=false, Feishu editor ignores
 5. System keyboard simulation — needs accessibility permissions, not universal
 
+### Known Limitations / 已知限制
+1. **嵌入的飞书电子表格 (Embedded Feishu Sheet/Excel)**
+   - 飞书文档内嵌的 Sheet 块（通过 `feishu.cn/sync/` 或 `feishu.cn/sheets/` 链接引用）无法提取内容
+   - 原因：嵌入的 Sheet 使用 canvas 虚拟渲染，PageMain blockManager 中对应节点的 data 为空
+   - 表现：提取结果中仅显示标题，表格内容完全缺失
+   - 影响：V2X协议文档中 ServiceCode 0x0525 的完整tag表、DK控车通讯协议中附录K 均因此无法提取
+   - **Workaround**: 用户手动导出 PDF（飞书 → 更多 → 导出PDF），PDF中包含渲染后的表格内容，可用 pdfplumber 等工具解析
+   - **Workaround 2**: 单独打开嵌入的 Sheet URL，使用 `feishu_skill.py extract` 提取（Sheet 类型文档可正常提取）
+2. **嵌入的子文档引用**
+   - 文档中通过 `mention_doc` 引用的子文档仅显示为链接，不会递归提取内容
+   - **Workaround**: 手动提取引用的子文档 URL，分别执行 extract
+
 ### Verified Capabilities (2026-02-07) / 已验证能力
 - ✅ Text, headings(1-9), dividers, code blocks, quotes, callouts
 - ✅ Lists (ordered with auto-numbering, unordered, todo, nested)
